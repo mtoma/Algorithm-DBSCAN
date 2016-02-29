@@ -1,8 +1,13 @@
 package Algorithm::DBSCAN;
 
-use 5.006;
 use strict;
 use warnings;
+use 5.10.1;
+
+use Data::Dumper;
+
+use Algorithm::DBSCAN::Point;
+use Algorithm::DBSCAN::Dataset;
 
 =head1 NAME
 
@@ -15,7 +20,6 @@ Version 0.01
 =cut
 
 our $VERSION = '0.01';
-
 
 =head1 SYNOPSIS
 
@@ -35,19 +39,202 @@ if you don't export anything, such as for a purely object-oriented module.
 
 =head1 SUBROUTINES/METHODS
 
-=head2 function1
+=cut
+
+=head2 new
 
 =cut
 
-sub function1 {
+sub new {
+	my($type, $dataset, $eps, $min_points) = @_;
+	
+	my $self = {};
+	$self->{dataset_object} = $dataset;
+	$self->{dataset} = $dataset->{points};
+	@{$self->{id_list}} = keys %{$dataset->{points}};
+	$self->{eps} = $eps;
+	$self->{min_points} = $min_points;
+	$self->{current_cluster} = 1;
+		
+	bless($self, $type);
+
+	return($self);
 }
 
-=head2 function2
+=head2 _one_more_point_visited
 
 =cut
 
-sub function2 {
+sub _one_more_point_visited {
+	my ($self) = @_;
+	
+	$self->{nb_visited_points}++;
+	$self->{start_time} = time() unless ($self->{start_time});
+	my $eta = time() + ((time() - $self->{start_time})/$self->{nb_visited_points})*(500000);
+	my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($eta);
+
+	say "ETA:".sprintf("%04d-%02d-%02d %02d:%02d:%02d",$year+1900,$mon+1,$mday,$hour,$min,$sec);
+	say "nb visited:".$self->{nb_visited_points};
 }
+
+=head2 FindClusters
+
+=cut
+
+sub FindClusters {
+	my ($self, $starting_point_id) = @_;
+
+	my $i = 0;
+	unshift(@{$self->{id_list}}, $starting_point_id) if (defined $starting_point_id);
+	foreach my $id (@{$self->{id_list}}) {
+		my $point = $self->{dataset}->{$id};
+		say "$i";
+		$i++;
+		next if ($point->{visited});
+		$point->{visited} = 1;
+		$self->_one_more_point_visited();
+		
+		my $neighborPts = $self->GetRegion($point);
+#say Dumper($neighborPts);
+		
+		if (scalar(@$neighborPts) < $self->{min_points}) {
+			$point->{cluster_id} = -1;
+		}
+		else {
+			$self->{current_cluster}++;
+			$self->ExpandCluster($point, $neighborPts);
+		}
+	}
+}
+
+=head2 PrintClusters
+
+=cut
+
+sub PrintClusters {
+	my ($self, $point) = @_;
+
+	my %clusters;
+	
+	foreach my $point (@{$self->{dataset}}) {
+		push(@{$clusters{$point->{cluster_id}}}, $point->{point_id});
+	}
+	
+	foreach my $cluster_id (sort keys %clusters) {
+		say "CLUSTER: $cluster_id";
+		foreach my $point_id (sort @{$clusters{$cluster_id}}) {
+			my $min_distance = 1000000000000;
+			my $closest_point_id;
+			foreach my $distance_point_id (sort @{$clusters{$cluster_id}}) {
+				if ($distance_point_id ne $point_id) {
+					my $this_point = $self->{dataset_object}->GetPointById($point_id);
+					my $distance_point = $self->{dataset_object}->GetPointById($distance_point_id);
+					
+					my $distance = $this_point->Distance($distance_point);
+					
+					if ($distance < $min_distance) {
+						$min_distance = $distance;
+						$closest_point_id = $distance_point_id;
+					}
+				}
+			}
+			
+			say "\t$point_id : (closest point: $closest_point_id, distance: $min_distance)";
+		}
+	}
+}
+
+=head2 PrintClustersShort
+
+=cut
+
+sub PrintClustersShort {
+        my ($self) = @_;
+
+        my %clusters;
+
+        foreach my $id (keys %{$self->{dataset}}) {
+		my $point = $self->{dataset}->{$id};
+                push(@{$clusters{$point->{cluster_id}}}, $point->{point_id});
+        }
+
+        foreach my $cluster_id (sort keys %clusters) {
+                say "CLUSTER: $cluster_id, [".scalar(@{$clusters{$cluster_id}})."] points";
+		my $nb = 0;
+                foreach my $point_id (sort @{$clusters{$cluster_id}}) {
+			$nb++;
+                        say "\t$point_id";
+			last if ($nb >= 100);
+                }
+        }
+}
+
+
+=head2 validate_answer
+
+=cut
+
+sub ExpandCluster {
+	my ($self, $point, $neighborPts) = @_;
+	
+	if (scalar(@$neighborPts) < $self->{min_points}) {
+		$point->{cluster_id} = -1;
+	}
+	else {
+		$self->{current_cluster}++;
+
+		$point->{cluster_id} = $self->{current_clustr};
+	
+		my $cluster_expanded = 0;
+		do {
+			$cluster_expanded = 0;
+			foreach my $id (@$neighborPts) {
+				my $p = $self->{dataset}->{$id};
+				unless ($p->{visited}) {
+					$p->{visited} = 1;
+					$self->_one_more_point_visited();
+					
+					my $neighborPtsOfClusterMember = $self->GetRegion($p);
+					if (scalar(@$neighborPtsOfClusterMember) >= $self->{min_points}) {
+						my %h;
+						foreach my $id1 (@$neighborPts, @$neighborPtsOfClusterMember) {
+							$h{$id1}++;
+						}
+						@$neighborPts = keys(%h);
+#die Dumper(@$neighborPts);
+say "Cluster [$self->{current_cluster}] has now [".scalar(@$neighborPts)."] members, added region of point:".Dumper($p);
+						$cluster_expanded = 1;
+						last;
+					}
+				}
+
+				$p->{cluster_id} = $self->{current_cluster} unless($p->{cluster_id});
+			}
+		}
+		while($cluster_expanded);
+	}
+}
+
+=head2 GetRegion
+
+=cut
+
+sub GetRegion {
+	my ($self, $point) = @_;
+
+	my $coordinate_id = join(',', @{$point->{coordinates}});
+	unless ($self->{point_neighbourhood_cache}->{$coordinate_id}) {
+		my @region;
+		
+		foreach my $region_candidate_point_id (@{$self->{id_list}}) {
+			push(@region, $region_candidate_point_id) if ($self->{dataset}->{$region_candidate_point_id}->Distance($point) < $self->{eps});
+		}
+		$self->{point_neighbourhood_cache}->{$coordinate_id} = \@region;
+	}
+	
+	return $self->{point_neighbourhood_cache}->{$coordinate_id};
+}
+
 
 =head1 AUTHOR
 
@@ -90,9 +277,6 @@ L<http://cpanratings.perl.org/d/Algorithm-DBSCAN>
 L<http://search.cpan.org/dist/Algorithm-DBSCAN/>
 
 =back
-
-
-=head1 ACKNOWLEDGEMENTS
 
 
 =head1 LICENSE AND COPYRIGHT

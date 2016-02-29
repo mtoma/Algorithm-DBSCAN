@@ -51,7 +51,5 @@ TODO: {
   );
 
   module_boilerplate_ok('lib/Algorithm/DBSCAN.pm');
-
-
 }
 
