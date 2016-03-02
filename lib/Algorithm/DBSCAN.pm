@@ -11,7 +11,7 @@ use Algorithm::DBSCAN::Dataset;
 
 =head1 NAME
 
-Algorithm::DBSCAN - The great new Algorithm::DBSCAN!
+Algorithm::DBSCAN - (ALFA code) Perl implementation of the DBSCAN (Density-Based Spatial Clustering of Applications with Noise) algorithm
 
 =head1 VERSION
 
@@ -23,25 +23,65 @@ our $VERSION = '0.01';
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
-
-Perhaps a little code snippet.
+This module can be used to find clusters of points in a multidimensional space. More information can be found on Wikipedia: L<DBSCAN|https://en.wikipedia.org/wiki/DBSCAN>
 
     use Algorithm::DBSCAN;
+    
+    my $points_data_file =     
+        'point_1 56.514307478581514 37.146118456702034
+        point_2 34.02049221667614 46.024651786417536
+        point_3 23.473087508078684 60.62328221968349
+        point_4 10.418513808840482 24.59808378533684
+        point_5 10.583414831970764 25.902459835735534
+        point_6 9.756855426925464 24.062840099892146
+        point_7 10.567067873860672 22.32511341184489
+        point_8 11.070046359352189 25.91278382647844
+        point_9 9.537780590838175 25.000630928726288
+        point_10 10.507367338512058 27.637356924097915
+        point_11 11.949089580614444 30.67843911922257
+        point_12 10.373548645248105 25.699863108892945
+        point_13 47.061169019689615 12.482585189174058
+        point_14 47.00269836645959 12.04880276389404
+        point_15 47.197663384856476 12.899232975457025
+        point_16 44.3719178488551 15.41709269630616
+        point_17 46.31921200316786 12.556849509965417
+        point_18 44.128763621333135 14.657970021594974
+        point_19 48.89953587475758 15.183892607591467
+        point_20 52.15333345222132 16.354597634497154
+        point_21 50.03978361242539 14.85901473647285';
 
-    my $foo = Algorithm::DBSCAN->new();
-    ...
+    my $dataset = Algorithm::DBSCAN::DataSet->new();
+    my @lines = split(/\n\s+/, $points_data_file);
+    foreach my $line (@lines) {
+        $dataset->AddPoint(new Algorithm::DBSCAN::Point(split(/\s+/, $line)));
+    }
 
-=head1 EXPORT
+    my $dbscan = Algorithm::DBSCAN->new($dataset, 4 * 4, 2);
 
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
+    $dbscan->FindClusters();
+    $dbscan->PrintClustersShort();
 
 =head1 SUBROUTINES/METHODS
 
 =cut
 
 =head2 new
+
+The constructor takes 3 parameters:
+    
+    $dataset: The Algorithm::DBSCAN::Dataset dataset object
+        
+        Create the Dataset object:
+            my $dataset = Algorithm::DBSCAN::DataSet->new();
+        
+        Add points (the first parameter is a point_id the other are point coordinates)
+			$dataset->AddPoint(new Algorithm::DBSCAN::Point('point_1', 1, 2, 3, 4, 5);
+			
+	$eps: The epsilon parameter used for region density computation
+		WARNING: This implementation uses the sqare distance between the points to avoid a useless square root call. If you want to use the euclidian distance you need to convert it to the right value yourself.
+		For example for the previous point with 5 dimensions $eps = $euclidian_distance * $euclidian_distance * $euclidian_distance * $euclidian_distance * $euclidian_distance; 
+		
+	$min_points: the minimal number of points in a region with a radius of $eps. $eps and $min_points are the 2 parameters used to compute the denisty of a region. If the number of points in a region with radius $eps is lower than $min_points the point is considered as an outlier point that can't be included in any cluster.
 
 =cut
 
@@ -63,6 +103,8 @@ sub new {
 
 =head2 _one_more_point_visited
 
+Simple method used to display progress
+
 =cut
 
 sub _one_more_point_visited {
@@ -78,6 +120,8 @@ sub _one_more_point_visited {
 }
 
 =head2 FindClusters
+
+The main method that will run the DBSCAN algorithm on the Dataset.
 
 =cut
 
@@ -108,6 +152,8 @@ sub FindClusters {
 }
 
 =head2 PrintClusters
+
+Will print the contents of the clusters
 
 =cut
 
@@ -146,6 +192,8 @@ sub PrintClusters {
 
 =head2 PrintClustersShort
 
+Will print the contents of the clusters (abreviated version)
+
 =cut
 
 sub PrintClustersShort {
@@ -170,7 +218,9 @@ sub PrintClustersShort {
 }
 
 
-=head2 validate_answer
+=head2 ExpandCluster
+
+This method will expand the cluster starting by the neighborhood of point $point
 
 =cut
 
@@ -217,6 +267,8 @@ say "Cluster [$self->{current_cluster}] has now [".scalar(@$neighborPts)."] memb
 
 =head2 GetRegion
 
+Find all points in the dataset that are in the neighborhood of $point
+
 =cut
 
 sub GetRegion {
@@ -242,7 +294,9 @@ Michal TOMA, C<< <mtoma at cpan.org> >>
 
 =head1 BUGS
 
-Please report any bugs or feature requests to C<bug-algorithm-dbscan at rt.cpan.org>, or through
+Please report any bugs or feature requests on github: L<https://github.com/mtoma/Algorithm-DBSCAN>
+
+By e-mail to C<bug-algorithm-dbscan at rt.cpan.org>, or through
 the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Algorithm-DBSCAN>.  I will be notified, and then you'll
 automatically be notified of progress on your bug as I make changes.
 

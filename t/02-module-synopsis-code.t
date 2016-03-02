@@ -46,18 +46,40 @@ sub validate_answer {
 	return 1;
 }
 
+my $points_data_file = 	
+	'point_1 56.514307478581514 37.146118456702034
+	point_2 34.02049221667614 46.024651786417536
+	point_3 23.473087508078684 60.62328221968349
+	point_4 10.418513808840482 24.59808378533684
+	point_5 10.583414831970764 25.902459835735534
+	point_6 9.756855426925464 24.062840099892146
+	point_7 10.567067873860672 22.32511341184489
+	point_8 11.070046359352189 25.91278382647844
+	point_9 9.537780590838175 25.000630928726288
+	point_10 10.507367338512058 27.637356924097915
+	point_11 11.949089580614444 30.67843911922257
+	point_12 10.373548645248105 25.699863108892945
+	point_13 47.061169019689615 12.482585189174058
+	point_14 47.00269836645959 12.04880276389404
+	point_15 47.197663384856476 12.899232975457025
+	point_16 44.3719178488551 15.41709269630616
+	point_17 46.31921200316786 12.556849509965417
+	point_18 44.128763621333135 14.657970021594974
+	point_19 48.89953587475758 15.183892607591467
+	point_20 52.15333345222132 16.354597634497154
+	point_21 50.03978361242539 14.85901473647285';
+
 my $dataset = Algorithm::DBSCAN::DataSet->new();
-my @lines = split(/\n/, read_file('test_datasets/dbscan_test_dataset_1.txt'));
+my @lines = split(/\n\s+/, $points_data_file);
 foreach my $line (@lines) {
 	$dataset->AddPoint(new Algorithm::DBSCAN::Point(split(/\s+/, $line)));
 }
 
-my $dbscan = Algorithm::DBSCAN->new($dataset, 3.1 * 3.1, 6);
+my $dbscan = Algorithm::DBSCAN->new($dataset, 4 * 4, 2);
 
 $dbscan->FindClusters();
-$dbscan->PrintClustersShort();
-my $result = validate_answer($dbscan, 'test_datasets/dbscan_test_dataset_1_result.txt');
+my $result = validate_answer($dbscan, 'test_datasets/dbscan_test_dataset_module_synopsis.txt');
 
-ok( $result eq '1', 'Clustering of dataset 1 ok' );
+ok( $result eq '1', 'Clustering of dataset module-synopsis-code ok' );
 
 done_testing;
