@@ -15,15 +15,18 @@ Algorithm::DBSCAN - (ALFA code) Perl implementation of the DBSCAN (Density-Based
 
 =head1 VERSION
 
-Version 0.03
+Version 0.04
 
 =cut
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 =head1 SYNOPSIS
 
-This module can be used to find clusters of points in a multidimensional space. More information can be found on Wikipedia: L<DBSCAN|https://en.wikipedia.org/wiki/DBSCAN>
+This module can be used to find clusters of points in a multidimensional space. 
+More information can be found on Wikipedia: L<DBSCAN|https://en.wikipedia.org/wiki/DBSCAN>
+
+The simple usage:
 
     use Algorithm::DBSCAN;
     
@@ -60,6 +63,95 @@ This module can be used to find clusters of points in a multidimensional space. 
 
     $dbscan->FindClusters();
     $dbscan->PrintClustersShort();
+    
+If you have huge datasets and want to use multiple CPUs in a optimal way you can build 
+the region index with an external tool (will soon be available). En axample of code that 
+uses a region index would be as follow.
+
+Given the dataset:
+    point_1 56 37
+    point_2 34 46
+    point_3 23 60
+    point_4 10 24
+    point_5 10 25
+    point_6 9 24
+    point_7 10 22
+    point_8 11 25
+    point_9 9 25
+    point_10 10 27
+    point_11 11 30
+    point_12 10 25
+    point_13 47 12
+    point_14 47 12
+    point_15 47 12
+    point_16 44 15
+    point_17 46 12
+    point_18 44 14
+    point_19 48 15
+    point_20 52 16
+    point_21 50 14
+
+The region index with $eps = 4 x 4 and $min_distance = 2 would look like this:
+    0 0
+    1 1
+    2 2
+    3 3 4 5 6 7 8 9 11
+    4 3 4 5 6 7 8 9 11
+    5 3 4 5 6 7 8 9 11
+    10 9 10
+    12 12 13 14 16 17 18 20
+    11 3 4 5 6 7 8 9 11
+    13 12 13 14 16 17 18 20
+    14 12 13 14 16 17 18 20
+    15 15 16 17
+    16 12 13 14 15 16 17 18
+    18 12 13 14 16 18 20
+    7 3 4 5 6 7 8 9 11
+    20 12 13 14 18 19 20
+    6 3 4 5 6 7 8 11
+    17 12 13 14 15 16 17
+    19 19 20
+    8 3 4 5 6 7 8 9 11
+    9 3 4 5 7 8 9 10 11
+
+To use this index you can use the following code:
+    use Algorithm::DBSCAN;
+    
+    my $points_data_file =     
+        'point_1 56 37
+        point_2 34 46
+        point_3 23 60
+        point_4 10 24
+        point_5 10 25
+        point_6 9 24
+        point_7 10 22
+        point_8 11 25
+        point_9 9 25
+        point_10 10 27
+        point_11 11 30
+        point_12 10 25
+        point_13 47 12
+        point_14 47 12
+        point_15 47 12
+        point_16 44 15
+        point_17 46 12
+        point_18 44 14
+        point_19 48 15
+        point_20 52 16
+        point_21 50 14';
+
+    my $dataset = Algorithm::DBSCAN::DataSet->new();
+    my @lines = split(/\n\s+/, $points_data_file);
+    foreach my $line (@lines) {
+        $dataset->AddPoint(new Algorithm::DBSCAN::Point(split(/\s+/, $line)));
+    }
+
+    my $dbscan = Algorithm::DBSCAN->new($dataset, 4 * 4, 2);
+
+    $dbscan->UseRegionIndex(the filename containg the previous region index);
+    $dbscan->FindClusters();
+    $dbscan->PrintClustersShort();
+  
 
 =head1 SUBROUTINES/METHODS
 
@@ -102,28 +194,11 @@ sub new {
 	$self->{eps} = $eps;
 	$self->{min_points} = $min_points;
 	$self->{current_cluster} = 1;
+	$self->{use_external_region_index} = 0;
 		
 	bless($self, $type);
 
 	return($self);
-}
-
-=head2 _one_more_point_visited
-
-Simple method used to display progress
-
-=cut
-
-sub _one_more_point_visited {
-	my ($self) = @_;
-	
-	$self->{nb_visited_points}++;
-	$self->{start_time} = time() unless ($self->{start_time});
-	my $eta = time() + ((time() - $self->{start_time})/$self->{nb_visited_points})*(500000);
-	my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($eta);
-
-	say "ETA:".sprintf("%04d-%02d-%02d %02d:%02d:%02d",$year+1900,$mon+1,$mday,$hour,$min,$sec);
-	say "nb visited:".$self->{nb_visited_points};
 }
 
 =head2 FindClusters
@@ -157,73 +232,6 @@ sub FindClusters {
 		}
 	}
 }
-
-=head2 PrintClusters
-
-Will print the contents of the clusters
-
-=cut
-
-sub PrintClusters {
-	my ($self, $point) = @_;
-
-	my %clusters;
-	
-	foreach my $point (@{$self->{dataset}}) {
-		push(@{$clusters{$point->{cluster_id}}}, $point->{point_id});
-	}
-	
-	foreach my $cluster_id (sort keys %clusters) {
-		say "CLUSTER: $cluster_id";
-		foreach my $point_id (sort @{$clusters{$cluster_id}}) {
-			my $min_distance = 1000000000000;
-			my $closest_point_id;
-			foreach my $distance_point_id (sort @{$clusters{$cluster_id}}) {
-				if ($distance_point_id ne $point_id) {
-					my $this_point = $self->{dataset_object}->GetPointById($point_id);
-					my $distance_point = $self->{dataset_object}->GetPointById($distance_point_id);
-					
-					my $distance = $this_point->Distance($distance_point);
-					
-					if ($distance < $min_distance) {
-						$min_distance = $distance;
-						$closest_point_id = $distance_point_id;
-					}
-				}
-			}
-			
-			say "\t$point_id : (closest point: $closest_point_id, distance: $min_distance)";
-		}
-	}
-}
-
-=head2 PrintClustersShort
-
-Will print the contents of the clusters (abreviated version)
-
-=cut
-
-sub PrintClustersShort {
-        my ($self) = @_;
-
-        my %clusters;
-
-        foreach my $id (keys %{$self->{dataset}}) {
-		my $point = $self->{dataset}->{$id};
-                push(@{$clusters{$point->{cluster_id}}}, $point->{point_id});
-        }
-
-        foreach my $cluster_id (sort keys %clusters) {
-                say "CLUSTER: $cluster_id, [".scalar(@{$clusters{$cluster_id}})."] points";
-		my $nb = 0;
-                foreach my $point_id (sort @{$clusters{$cluster_id}}) {
-			$nb++;
-                        say "\t$point_id";
-			last if ($nb >= 100);
-                }
-        }
-}
-
 
 =head2 ExpandCluster
 
@@ -282,18 +290,134 @@ sub GetRegion {
 	my ($self, $point) = @_;
 
 	my $coordinate_id = join(',', @{$point->{coordinates}});
-	unless ($self->{point_neighbourhood_cache}->{$coordinate_id}) {
-		my @region;
-		
-		foreach my $region_candidate_point_id (@{$self->{id_list}}) {
-			push(@region, $region_candidate_point_id) if ($self->{dataset}->{$region_candidate_point_id}->Distance($point) < $self->{eps});
+	if ($self->{use_external_region_index}) {
+		my $fh = $self->{region_index_filehandle};
+		seek($fh, $self->{region_seek_index}->{$point->{id}}, 0) or return;
+		my $region_str = <$fh>;
+		my @points = split(/\s+/, $region_str);
+		shift(@points);
+		$self->{point_neighbourhood_cache}->{$coordinate_id} = \@points;
+	}
+	else {
+		unless ($self->{point_neighbourhood_cache}->{$coordinate_id}) {
+			my @region;
+			
+			foreach my $region_candidate_point_id (@{$self->{id_list}}) {
+				push(@region, $region_candidate_point_id) if ($self->{dataset}->{$region_candidate_point_id}->Distance($point) < $self->{eps});
+			}
+			$self->{point_neighbourhood_cache}->{$coordinate_id} = \@region;
 		}
-		$self->{point_neighbourhood_cache}->{$coordinate_id} = \@region;
 	}
 	
 	return $self->{point_neighbourhood_cache}->{$coordinate_id};
 }
 
+=head2 UseRegionIndex
+
+For huge datasets a region index can be generated separately (and using multiple cores).
+The index is a list of regions for each point in the dataset.
+
+=cut
+
+sub UseRegionIndex {
+	my ($self, $region_index_filename) = @_;
+
+	open(my $fh,  "<", $region_index_filename);
+	my $offset = 0;
+
+	while (<$fh>) {
+		my @points = split(/\s+/, $_);
+		$self->{region_seek_index}->{$points[0]} = $offset;
+		$offset = tell($fh);
+	}
+		
+	$self->{use_external_region_index} = 1;
+	$self->{region_index_filehandle} = $fh;
+}
+
+=head2 PrintClusters
+
+Will print the contents of the clusters
+
+=cut
+
+sub PrintClusters {
+	my ($self, $point) = @_;
+
+	my %clusters;
+	
+	foreach my $point (@{$self->{dataset}}) {
+		push(@{$clusters{$point->{cluster_id}}}, $point->{point_id});
+	}
+	
+	foreach my $cluster_id (sort keys %clusters) {
+		say "CLUSTER: $cluster_id";
+		foreach my $point_id (sort @{$clusters{$cluster_id}}) {
+			my $min_distance = 1000000000000;
+			my $closest_point_id;
+			foreach my $distance_point_id (sort @{$clusters{$cluster_id}}) {
+				if ($distance_point_id ne $point_id) {
+					my $this_point = $self->{dataset_object}->GetPointById($point_id);
+					my $distance_point = $self->{dataset_object}->GetPointById($distance_point_id);
+					
+					my $distance = $this_point->Distance($distance_point);
+					
+					if ($distance < $min_distance) {
+						$min_distance = $distance;
+						$closest_point_id = $distance_point_id;
+					}
+				}
+			}
+			
+			say "\t$point_id : (closest point: $closest_point_id, distance: $min_distance)";
+		}
+	}
+}
+
+=head2 PrintClustersShort
+
+Will print the contents of the clusters (abreviated version)
+
+=cut
+
+sub PrintClustersShort {
+	my ($self) = @_;
+
+	my %clusters;
+
+	foreach my $id (keys %{$self->{dataset}}) {
+	my $point = $self->{dataset}->{$id};
+		push(@{$clusters{$point->{cluster_id}}}, $point->{point_id});
+	}
+
+	foreach my $cluster_id (sort keys %clusters) {
+	say "CLUSTER: $cluster_id, [".scalar(@{$clusters{$cluster_id}})."] points";
+	my $nb = 0;
+		foreach my $point_id (sort @{$clusters{$cluster_id}}) {
+			$nb++;
+			say "\t$point_id";
+			last if ($nb >= 100);
+		}
+	}
+}
+
+=head2 _one_more_point_visited
+
+Simple method used to display progress
+
+=cut
+
+sub _one_more_point_visited {
+	my ($self) = @_;
+	
+	$self->{nb_visited_points}++;
+	$self->{start_time} = time() unless ($self->{start_time});
+	my $eta = time() + ((time() - $self->{start_time})/$self->{nb_visited_points})*(500000);
+	my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($eta);
+
+	say "ETA:".sprintf("%04d-%02d-%02d %02d:%02d:%02d",$year+1900,$mon+1,$mday,$hour,$min,$sec);
+	say "nb visited:".$self->{nb_visited_points};
+}
 
 =head1 AUTHOR
 
@@ -319,7 +443,11 @@ You can find documentation for this module with the perldoc command.
 
 You can also look for information at:
 
-=over 4
+=over 5
+
+=item * Github: Issues (report bugs here)
+
+L<https://github.com/mtoma/Algorithm-DBSCAN>
 
 =item * RT: CPAN's request tracker (report bugs here)
 
