@@ -1,4 +1,4 @@
-package Algorithm::DBSCAN::DataSet;
+package Algorithm::DBSCAN::Dataset;
 
 
 sub new {

@@ -15,11 +15,11 @@ Algorithm::DBSCAN - (ALFA code) Perl implementation of the DBSCAN (Density-Based
 
 =head1 VERSION
 
-Version 0.04
+Version 0.05
 
 =cut
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 =head1 SYNOPSIS
 
@@ -53,7 +53,7 @@ The simple usage:
         point_20 52.15333345222132 16.354597634497154
         point_21 50.03978361242539 14.85901473647285';
 
-    my $dataset = Algorithm::DBSCAN::DataSet->new();
+    my $dataset = Algorithm::DBSCAN::Dataset->new();
     my @lines = split(/\n\s+/, $points_data_file);
     foreach my $line (@lines) {
         $dataset->AddPoint(new Algorithm::DBSCAN::Point(split(/\s+/, $line)));
@@ -140,7 +140,7 @@ To use this index you can use the following code:
         point_20 52 16
         point_21 50 14';
 
-    my $dataset = Algorithm::DBSCAN::DataSet->new();
+    my $dataset = Algorithm::DBSCAN::Dataset->new();
     my @lines = split(/\n\s+/, $points_data_file);
     foreach my $line (@lines) {
         $dataset->AddPoint(new Algorithm::DBSCAN::Point(split(/\s+/, $line)));
@@ -164,7 +164,7 @@ The constructor takes 3 parameters:
     $dataset: The Algorithm::DBSCAN::Dataset dataset object
         
         Create the Dataset object:
-            my $dataset = Algorithm::DBSCAN::DataSet->new();
+            my $dataset = Algorithm::DBSCAN::Dataset->new();
         
         Add points (the first parameter is a point_id the other are point coordinates)
             $dataset->AddPoint(new Algorithm::DBSCAN::Point('point_1', 1, 2, 3, 4, 5);

@@ -70,7 +70,7 @@ my $points_data_file =
 	point_21 50.03978361242539 14.85901473647285';
 
 
-my $dataset = Algorithm::DBSCAN::DataSet->new();
+my $dataset = Algorithm::DBSCAN::Dataset->new();
 my @lines = split(/\n\s+/, $points_data_file);
 foreach my $line (@lines) {
 	$dataset->AddPoint(new Algorithm::DBSCAN::Point(split(/\s+/, $line)));

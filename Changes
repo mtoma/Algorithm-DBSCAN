@@ -1,5 +1,11 @@
 Revision history for Algorithm-DBSCAN
 
+0.05	2016-03-03
+		Fixed DataSet vs Dataset problem
+		
+0.04	2016-03-03
+		Added the UseRegionIndex method
+
 0.03	2016-03-03
 		Fixed MANFEST
 		

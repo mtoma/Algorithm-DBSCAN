@@ -46,7 +46,7 @@ sub validate_answer {
 	return 1;
 }
 
-my $dataset = Algorithm::DBSCAN::DataSet->new();
+my $dataset = Algorithm::DBSCAN::Dataset->new();
 my @lines = split(/\n/, read_file('test_datasets/dbscan_test_dataset_2.txt'));
 foreach my $line (@lines) {
 	$dataset->AddPoint(new Algorithm::DBSCAN::Point(split(/\s+/, $line)));
