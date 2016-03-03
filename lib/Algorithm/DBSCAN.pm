@@ -15,11 +15,11 @@ Algorithm::DBSCAN - (ALFA code) Perl implementation of the DBSCAN (Density-Based
 
 =head1 VERSION
 
-Version 0.01
+Version 0.03
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.03';
 
 =head1 SYNOPSIS
 
@@ -75,13 +75,20 @@ The constructor takes 3 parameters:
             my $dataset = Algorithm::DBSCAN::DataSet->new();
         
         Add points (the first parameter is a point_id the other are point coordinates)
-			$dataset->AddPoint(new Algorithm::DBSCAN::Point('point_1', 1, 2, 3, 4, 5);
-			
-	$eps: The epsilon parameter used for region density computation
-		WARNING: This implementation uses the sqare distance between the points to avoid a useless square root call. If you want to use the euclidian distance you need to convert it to the right value yourself.
-		For example for the previous point with 5 dimensions $eps = $euclidian_distance * $euclidian_distance * $euclidian_distance * $euclidian_distance * $euclidian_distance; 
-		
-	$min_points: the minimal number of points in a region with a radius of $eps. $eps and $min_points are the 2 parameters used to compute the denisty of a region. If the number of points in a region with radius $eps is lower than $min_points the point is considered as an outlier point that can't be included in any cluster.
+            $dataset->AddPoint(new Algorithm::DBSCAN::Point('point_1', 1, 2, 3, 4, 5);
+            
+    $eps: The epsilon parameter used for region density computation
+        WARNING: This implementation uses the sqare distance between the points to avoid 
+        a useless square root call. If you want to use the euclidian distance you need to 
+        convert it to the right value yourself.
+        
+        For example for the previous point with 5 dimensions 
+        $eps = $euclidian_distance * $euclidian_distance * $euclidian_distance * $euclidian_distance * $euclidian_distance; 
+        
+    $min_points: the minimal number of points in a region with a radius of $eps. $eps 
+    and $min_points are the 2 parameters used to compute the denisty of a region. If 
+    the number of points in a region with radius $eps is lower than $min_points the 
+    point is considered as an outlier point that can't be included in any cluster.
 
 =cut
 
