@@ -263,7 +263,7 @@ sub ExpandCluster {
 					if (scalar(@$neighborPtsOfClusterMember) >= $self->{min_points}) {
 						map { $cluster_points{$_}++ } @$neighborPtsOfClusterMember;
 
-say "Cluster [$self->{current_cluster}] has now [".scalar(keys %cluster_points)."] members, added region of point:".Dumper($p);
+say "Cluster [$self->{current_cluster}] has now [".scalar(keys %cluster_points)."] members, added region of point:[$p->{point_id}]";
 						$cluster_expanded = 1;
 						last;
 					}
