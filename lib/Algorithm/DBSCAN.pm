@@ -13,13 +13,9 @@ use Algorithm::DBSCAN::Dataset;
 
 Algorithm::DBSCAN - (ALFA code) Perl implementation of the DBSCAN (Density-Based Spatial Clustering of Applications with Noise) algorithm
 
-=head1 VERSION
-
-Version 0.05
-
 =cut
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 =head1 SYNOPSIS
 
@@ -69,6 +65,7 @@ the region index with an external tool (will soon be available). En axample of c
 uses a region index would be as follow.
 
 Given the dataset:
+
     point_1 56 37
     point_2 34 46
     point_3 23 60
@@ -92,6 +89,7 @@ Given the dataset:
     point_21 50 14
 
 The region index with $eps = 4 x 4 and $min_distance = 2 would look like this:
+
     0 0
     1 1
     2 2
@@ -115,6 +113,7 @@ The region index with $eps = 4 x 4 and $min_distance = 2 would look like this:
     9 3 4 5 7 8 9 10 11
 
 To use this index you can use the following code:
+
     use Algorithm::DBSCAN;
     
     my $points_data_file =     
@@ -227,7 +226,6 @@ sub FindClusters {
 			$point->{cluster_id} = -1;
 		}
 		else {
-			$self->{current_cluster}++;
 			$self->ExpandCluster($point, $neighborPts);
 		}
 	}
@@ -248,12 +246,14 @@ sub ExpandCluster {
 	else {
 		$self->{current_cluster}++;
 
-		$point->{cluster_id} = $self->{current_clustr};
+		$point->{cluster_id} = $self->{current_cluster};
 	
+		my %cluster_points;
+		map { $cluster_points{$_}++ } @$neighborPts;
 		my $cluster_expanded = 0;
 		do {
 			$cluster_expanded = 0;
-			foreach my $id (@$neighborPts) {
+			foreach my $id (keys %cluster_points) {
 				my $p = $self->{dataset}->{$id};
 				unless ($p->{visited}) {
 					$p->{visited} = 1;
@@ -261,13 +261,9 @@ sub ExpandCluster {
 					
 					my $neighborPtsOfClusterMember = $self->GetRegion($p);
 					if (scalar(@$neighborPtsOfClusterMember) >= $self->{min_points}) {
-						my %h;
-						foreach my $id1 (@$neighborPts, @$neighborPtsOfClusterMember) {
-							$h{$id1}++;
-						}
-						@$neighborPts = keys(%h);
-#die Dumper(@$neighborPts);
-say "Cluster [$self->{current_cluster}] has now [".scalar(@$neighborPts)."] members, added region of point:".Dumper($p);
+						map { $cluster_points{$_}++ } @$neighborPtsOfClusterMember;
+
+say "Cluster [$self->{current_cluster}] has now [".scalar(keys %cluster_points)."] members, added region of point:".Dumper($p);
 						$cluster_expanded = 1;
 						last;
 					}

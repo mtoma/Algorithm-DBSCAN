@@ -1,5 +1,8 @@
 Revision history for Algorithm-DBSCAN
 
+0.06	2016-03-03
+		Minor doc and bug fixes
+
 0.05	2016-03-03
 		Fixed DataSet vs Dataset problem
 		

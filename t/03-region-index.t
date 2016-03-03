@@ -23,6 +23,8 @@ sub validate_answer {
 	
 	my @result_clusters = split(/\n/, read_file($results_file));
 	
+	die "The number of clusters doesn't match" if (scalar(keys %clusters) - 1 != scalar(@result_clusters));
+
 	foreach my $result_cluster (@result_clusters) {
 		$result_cluster =~ s/[<>,]//g;
 		my @points = split(/\s+/, $result_cluster);
