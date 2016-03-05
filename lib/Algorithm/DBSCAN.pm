@@ -15,7 +15,7 @@ Algorithm::DBSCAN - (ALFA code) Perl implementation of the DBSCAN (Density-Based
 
 =cut
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 =head1 SYNOPSIS
 
@@ -285,6 +285,8 @@ Find all points in the dataset that are in the neighborhood of $point
 sub GetRegion {
 	my ($self, $point) = @_;
 
+	my $result; 
+	
 	my $coordinate_id = join(',', @{$point->{coordinates}});
 	if ($self->{use_external_region_index}) {
 		my $fh = $self->{region_index_filehandle};
@@ -292,7 +294,7 @@ sub GetRegion {
 		my $region_str = <$fh>;
 		my @points = split(/\s+/, $region_str);
 		shift(@points);
-		$self->{point_neighbourhood_cache}->{$coordinate_id} = \@points;
+		$result = \@points;
 	}
 	else {
 		unless ($self->{point_neighbourhood_cache}->{$coordinate_id}) {
@@ -303,9 +305,11 @@ sub GetRegion {
 			}
 			$self->{point_neighbourhood_cache}->{$coordinate_id} = \@region;
 		}
+		
+		$result = $self->{point_neighbourhood_cache}->{$coordinate_id};
 	}
 	
-	return $self->{point_neighbourhood_cache}->{$coordinate_id};
+	return $result;
 }
 
 =head2 UseRegionIndex
