@@ -8,6 +8,7 @@ use Data::Dumper;
 
 use Algorithm::DBSCAN::Point;
 use Algorithm::DBSCAN::Dataset;
+use DBI;
 
 =head1 NAME
 
@@ -190,6 +191,7 @@ sub new {
 	$self->{dataset_object} = $dataset;
 	$self->{dataset} = $dataset->{points};
 	@{$self->{id_list}} = keys %{$dataset->{points}};
+	$self->{dataset_size} = scalar keys %{$dataset->{points}};
 	$self->{eps} = $eps;
 	$self->{min_points} = $min_points;
 	$self->{current_cluster} = 1;
@@ -213,7 +215,7 @@ sub FindClusters {
 	unshift(@{$self->{id_list}}, $starting_point_id) if (defined $starting_point_id);
 	foreach my $id (@{$self->{id_list}}) {
 		my $point = $self->{dataset}->{$id};
-		say "$i";
+#		say "$i";
 		$i++;
 		next if ($point->{visited});
 		$point->{visited} = 1;
@@ -228,6 +230,7 @@ sub FindClusters {
 		else {
 			$self->ExpandCluster($point, $neighborPts);
 		}
+#return if ($self->{nb_visited_points} > 100);
 	}
 }
 
@@ -263,14 +266,14 @@ sub ExpandCluster {
 					if (scalar(@$neighborPtsOfClusterMember) >= $self->{min_points}) {
 						map { $cluster_points{$_}++ } @$neighborPtsOfClusterMember;
 
-say "Cluster [$self->{current_cluster}] has now [".scalar(keys %cluster_points)."] members, added region of point:[$p->{point_id}]";
+say "Cluster [$self->{current_cluster}] has now [".scalar(keys %cluster_points)."] members, added region of point:[$p->{point_id}]" if ($self->{nb_visited_points} % 100000 == 0) ;
 						$cluster_expanded = 1;
 						last;
 					}
 				}
-
 				$p->{cluster_id} = $self->{current_cluster} unless($p->{cluster_id});
 			}
+#return if ($self->{nb_visited_points} > 100);
 		}
 		while($cluster_expanded);
 	}
@@ -287,16 +290,23 @@ sub GetRegion {
 
 	my $result; 
 	
-	my $coordinate_id = join(',', @{$point->{coordinates}});
 	if ($self->{use_external_region_index}) {
 		my $fh = $self->{region_index_filehandle};
-		seek($fh, $self->{region_seek_index}->{$point->{id}}, 0) or return;
-		my $region_str = <$fh>;
-		my @points = split(/\s+/, $region_str);
-		shift(@points);
-		$result = \@points;
+		if (defined $self->{region_seek_index}->{$point->{point_id}}) {
+			seek($fh, $self->{region_seek_index}->{$point->{point_id}}, 0) or die "Region index SEEK ERROR";
+			my $region_str = <$fh>;
+			my @points = split(/\s+/, $region_str);
+#say Dumper(\@points);
+			shift(@points);
+			$result = \@points;
+		}
+		else {
+#say "NO REGION FOR POINT:[$point->{point_id}]";
+			return [];
+		}
 	}
 	else {
+		my $coordinate_id = join(',', @{$point->{coordinates}});
 		unless ($self->{point_neighbourhood_cache}->{$coordinate_id}) {
 			my @region;
 			
@@ -325,9 +335,13 @@ sub UseRegionIndex {
 	open(my $fh,  "<", $region_index_filename);
 	my $offset = 0;
 
+	my $i = 0;
 	while (<$fh>) {
-		my @points = split(/\s+/, $_);
-		$self->{region_seek_index}->{$points[0]} = $offset;
+		$i++;
+		my $line = $_;
+		my ($point_id) = ($line =~ /^(.+?)\s/);
+		$self->{region_seek_index}->{$point_id} = $offset;
+say "[$i] \$self->{region_seek_index}->{$point_id} = $offset" if ($i % 100000 == 0);
 		$offset = tell($fh);
 	}
 		
@@ -386,7 +400,7 @@ sub PrintClustersShort {
 	my %clusters;
 
 	foreach my $id (keys %{$self->{dataset}}) {
-	my $point = $self->{dataset}->{$id};
+		my $point = $self->{dataset}->{$id};
 		push(@{$clusters{$point->{cluster_id}}}, $point->{point_id});
 	}
 
@@ -401,6 +415,31 @@ sub PrintClustersShort {
 	}
 }
 
+=head2 PrintClustersShort
+
+Save the clusters 
+
+=cut
+
+sub SaveClusters {
+	my ($self, $source_http_dnu_batch_id) = @_;
+
+	my $connection_string = "DBI:Pg:database=domain_data_database;host=labs01.ope.prive.nic.fr;port=5432;";
+	my $dbh = DBI->connect($connection_string, "dnscare", "dnscare", {RaiseError => 1, AutoCommit => 1});
+
+	my $i = 0;
+	$dbh->do("DELETE FROM dnu.classification_sites_web_par_clustering WHERE source_http_dnu_batch_id=?", undef, $source_http_dnu_batch_id);
+	$dbh->begin_work();
+	foreach my $id (keys %{$self->{dataset}}) {
+		$i++;
+		my $point = $self->{dataset}->{$id};
+#		push(@{$clusters{$point->{cluster_id}}}, $point->{point_id});
+		say "Saved [$i]" if ($i % 100000 == 0);
+		$dbh->do("INSERT INTO dnu.classification_sites_web_par_clustering (domain, source_http_dnu_batch_id, cluster_id) VALUES(?, ?, ?)", undef, $point->{point_id}, $source_http_dnu_batch_id, $point->{cluster_id} );
+	}
+	$dbh->commit();
+}
+
 =head2 _one_more_point_visited
 
 Simple method used to display progress
@@ -412,11 +451,13 @@ sub _one_more_point_visited {
 	
 	$self->{nb_visited_points}++;
 	$self->{start_time} = time() unless ($self->{start_time});
-	my $eta = time() + ((time() - $self->{start_time})/$self->{nb_visited_points})*(500000);
+	my $eta = time() + ((time() - $self->{start_time})/$self->{nb_visited_points})*($self->{dataset_size});
 	my($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($eta);
 
-	say "ETA:".sprintf("%04d-%02d-%02d %02d:%02d:%02d",$year+1900,$mon+1,$mday,$hour,$min,$sec);
-	say "nb visited:".$self->{nb_visited_points};
+	if ($self->{nb_visited_points} % 10000 == 0) {
+		say "ETA:".sprintf("%04d-%02d-%02d %02d:%02d:%02d",$year+1900,$mon+1,$mday,$hour,$min,$sec);
+		say "nb visited:".$self->{nb_visited_points};
+	}
 }
 
 =head1 AUTHOR
